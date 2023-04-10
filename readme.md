@@ -6,4 +6,4 @@ Tutorial: http://www.devexchanges.info/2016/10/simple-bluetooth-chat-application
 
 Status: runs when the 2 devices where paired outside of the program
 
-Missing: runtime permissions & set devices in couple mode
+Missing: runtime permissions (done) & set devices in discoverable mode (done)

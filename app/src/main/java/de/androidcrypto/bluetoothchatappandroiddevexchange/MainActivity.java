@@ -1,5 +1,7 @@
 package de.androidcrypto.bluetoothchatappandroiddevexchange;
 
+import android.Manifest;
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.Dialog;
 import android.bluetooth.BluetoothAdapter;
@@ -8,9 +10,11 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Message;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -19,17 +23,21 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
 
 import com.google.android.material.textfield.TextInputLayout;
 
 import java.util.ArrayList;
 import java.util.Set;
 
+@SuppressLint("MissingPermission")
 public class MainActivity extends AppCompatActivity {
 
     private TextView status;
-    private Button btnConnect;
+    private Button btnConnect, btnDiscoverable;
     private ListView listView;
     private Dialog dialog;
     private TextInputLayout inputLayout;
@@ -49,12 +57,38 @@ public class MainActivity extends AppCompatActivity {
     private BluetoothDevice connectingDevice;
     private ArrayAdapter<String> discoveredDevicesAdapter;
 
+    /**
+     * This block is for requesting permissions on Android 12+
+     */
+
+    private static final int PERMISSIONS_REQUEST_CODE = 191;
+    private static final String[] BLE_PERMISSIONS = new String[]{
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+            Manifest.permission.ACCESS_FINE_LOCATION,
+    };
+
+    private static final String[] ANDROID_12_BLE_PERMISSIONS = new String[]{
+            Manifest.permission.BLUETOOTH_SCAN,
+            Manifest.permission.BLUETOOTH_CONNECT,
+            Manifest.permission.BLUETOOTH_ADVERTISE,
+            Manifest.permission.ACCESS_FINE_LOCATION
+    };
+
+    public static void requestBlePermissions(Activity activity, int requestCode) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+            ActivityCompat.requestPermissions(activity, ANDROID_12_BLE_PERMISSIONS, requestCode);
+        else
+            ActivityCompat.requestPermissions(activity, BLE_PERMISSIONS, requestCode);
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_main);
         findViewsByIds();
+
+        requestBlePermissions(this, PERMISSIONS_REQUEST_CODE);
 
         //check device support bluetooth or not
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
@@ -71,11 +105,42 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        btnDiscoverable.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                // https://developer.android.com/guide/topics/connectivity/bluetooth/find-bluetooth-devices#enable-discoverability
+
+                Intent intent = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
+                //startActivityForResult(intent ,REQUEST_DISCOVER_BT);
+                activityResultLauncher.launch(intent);
+                /*
+                int requestCode = 1;
+                Intent discoverableIntent =
+                        new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
+                discoverableIntent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 60);
+                startActivityForResult(discoverableIntent, requestCode);
+
+                 */
+                // for deprecated see https://stackoverflow.com/a/71028573/8166854
+            }
+        });
+
         //set chat adapter
         chatMessages = new ArrayList<>();
         chatAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, chatMessages);
         listView.setAdapter(chatAdapter);
     }
+
+    ActivityResultLauncher<Intent> activityResultLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                if (result.getResultCode() == Activity.RESULT_OK) {
+                    Log.e("Activity result","OK");
+                    // There are no request codes
+                    Intent data = result.getData();
+                    System.out.println("data: " + data.getData());
+                }
+            });
 
     private Handler handler = new Handler(new Handler.Callback() {
 
@@ -217,6 +282,7 @@ public class MainActivity extends AppCompatActivity {
     private void findViewsByIds() {
         status = (TextView) findViewById(R.id.status);
         btnConnect = (Button) findViewById(R.id.btn_connect);
+        btnDiscoverable = findViewById(R.id.btn_discoverable);
         listView = (ListView) findViewById(R.id.list);
         inputLayout = (TextInputLayout) findViewById(R.id.input_layout);
         View btnSend = findViewById(R.id.btn_send);
